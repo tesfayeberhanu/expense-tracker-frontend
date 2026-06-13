@@ -17,4 +17,13 @@ module.exports = {
       { allowConstantExport: true },
     ],
   },
+  overrides: [
+    {
+      files: ['api/**/*.js'],
+      env: { browser: false, node: true, es2022: true },
+      globals: { fetch: 'readonly' },
+      extends: ['eslint:recommended'],
+      rules: { 'react-refresh/only-export-components': 'off' },
+    },
+  ],
 }

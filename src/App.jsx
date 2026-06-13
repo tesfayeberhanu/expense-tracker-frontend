@@ -3,10 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import "./App.css";
 import lpLogo from "./assets/lp-logo.png";
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
-const API_URL = `${API_BASE_URL.replace(/\/+$/, "")}/transactions`;
-const LOGIN_USERNAME = "Leo";
-const LOGIN_PASSWORD = "23456";
+const API_URL = "/api/transactions";
 
 const pipelines = [
   "Cash",
@@ -297,6 +294,7 @@ function TransactionTypeSummaryCards({ summary, reportTotals }) {
 
 function App() {
   const [isSignedIn, setIsSignedIn] = useState(false);
+  const [isCheckingSession, setIsCheckingSession] = useState(true);
   const [loginForm, setLoginForm] = useState({ username: "", password: "" });
   const [loginError, setLoginError] = useState("");
   const [transactions, setTransactions] = useState([]);
@@ -326,6 +324,21 @@ function App() {
   });
   const profileRef = useRef(null);
   const importInputRef = useRef(null);
+
+  useEffect(() => {
+    const restoreSession = async () => {
+      try {
+        const response = await fetch("/api/session");
+        setIsSignedIn(response.ok);
+      } catch {
+        setIsSignedIn(false);
+      } finally {
+        setIsCheckingSession(false);
+      }
+    };
+
+    restoreSession();
+  }, []);
 
   useEffect(() => {
     if (!isSignedIn) return;
@@ -728,19 +741,36 @@ function App() {
     }
   };
 
-  const handleSignIn = (event) => {
+  const handleSignIn = async (event) => {
     event.preventDefault();
-
-    if (
-      loginForm.username !== LOGIN_USERNAME ||
-      loginForm.password !== LOGIN_PASSWORD
-    ) {
-      setLoginError("Incorrect username or password.");
-      return;
-    }
-
     setLoginError("");
-    setIsSignedIn(true);
+
+    try {
+      const response = await fetch("/api/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(loginForm),
+      });
+
+      if (!response.ok) {
+        const result = await response.json().catch(() => ({}));
+        throw new Error(result.error || "Could not sign in.");
+      }
+
+      setLoginForm({ username: "", password: "" });
+      setIsSignedIn(true);
+    } catch (err) {
+      setLoginError(err.message);
+    }
+  };
+
+  const handleSignOut = async () => {
+    setProfileOpen(false);
+    setLoginForm({ username: "", password: "" });
+    setNotice("");
+    setTransactions([]);
+    setIsSignedIn(false);
+    await fetch("/api/logout", { method: "POST" }).catch(() => {});
   };
 
   const handlePasswordReset = (event) => {
@@ -754,6 +784,16 @@ function App() {
     setResetEmail(settings.email);
     setNotice("Settings saved.");
   };
+
+  if (isCheckingSession) {
+    return (
+      <main className="login-page">
+        <section className="login-card">
+          <p className="subtitle">Checking your session...</p>
+        </section>
+      </main>
+    );
+  }
 
   if (!isSignedIn) {
     return (
@@ -898,12 +938,7 @@ function App() {
                   <button
                     className="signout"
                     type="button"
-                    onClick={() => {
-                      setProfileOpen(false);
-                      setLoginForm({ username: "", password: "" });
-                      setNotice("");
-                      setIsSignedIn(false);
-                    }}
+                    onClick={handleSignOut}
                   >
                     ↪ Sign out
                   </button>
