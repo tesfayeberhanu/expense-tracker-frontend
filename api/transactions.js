@@ -1,8 +1,14 @@
-import { hasValidSession, requireSameOrigin, sendJson } from "./_auth.js";
+import {
+  hasValidSession,
+  requireApiRequest,
+  requireSameOrigin,
+  sendJson,
+} from "./_auth.js";
 
 const ALLOWED_METHODS = new Set(["GET", "POST"]);
 
 export default async function handler(request, response) {
+  if (!requireApiRequest(request, response)) return;
   if (!requireSameOrigin(request, response)) return;
 
   if (!hasValidSession(request)) {

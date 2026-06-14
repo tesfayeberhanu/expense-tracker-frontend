@@ -32,6 +32,8 @@ Requires a valid signed session:
 - `POST /api/transactions`
 
 State-changing API requests also reject cross-site origins.
+Direct browser navigation to `/api/transactions` is rejected; authenticated
+dashboard requests continue to use the endpoint normally.
 
 For local development with Vercel functions:
 

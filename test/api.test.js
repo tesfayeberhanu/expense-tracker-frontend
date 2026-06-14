@@ -84,3 +84,21 @@ test("rejects cross-site state-changing requests", async () => {
     });
   }
 });
+
+test("rejects direct browser navigation to transactions", async () => {
+  const cookie = createSessionCookie().split(";")[0];
+  const apiResponse = response();
+
+  await transactions(
+    request("GET", {
+      accept: "text/html,application/xhtml+xml",
+      cookie,
+      "sec-fetch-dest": "document",
+      "sec-fetch-mode": "navigate",
+    }),
+    apiResponse,
+  );
+
+  assert.equal(apiResponse.statusCode, 404);
+  assert.deepEqual(apiResponse.body, { error: "API endpoint not found." });
+});

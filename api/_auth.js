@@ -106,3 +106,20 @@ export const requireSameOrigin = (request, response) => {
 
   return true;
 };
+
+export const requireApiRequest = (request, response) => {
+  const fetchMode = request.headers["sec-fetch-mode"];
+  const fetchDestination = request.headers["sec-fetch-dest"];
+  const accept = request.headers.accept || "";
+
+  if (
+    fetchMode === "navigate" ||
+    fetchDestination === "document" ||
+    accept.includes("text/html")
+  ) {
+    sendJson(response, 404, { error: "API endpoint not found." });
+    return false;
+  }
+
+  return true;
+};
