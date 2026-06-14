@@ -4,6 +4,13 @@ import "./App.css";
 import lpLogo from "./assets/lp-logo.png";
 
 const API_URL = "/api/transactions";
+const SETTINGS_URL = "/api/settings";
+const initialSettings = {
+  name: "LP Finance",
+  email: "",
+  weeklySummary: true,
+  transactionAlerts: true,
+};
 
 const pipelines = [
   "Cash",
@@ -315,13 +322,8 @@ function App() {
   const [notice, setNotice] = useState("");
   const [profileOpen, setProfileOpen] = useState(false);
   const [resetOpen, setResetOpen] = useState(false);
-  const [resetEmail, setResetEmail] = useState("leo@leop.com");
-  const [settings, setSettings] = useState({
-    name: "Leo P",
-    email: "leo@leop.com",
-    weeklySummary: true,
-    transactionAlerts: true,
-  });
+  const [resetEmail, setResetEmail] = useState("");
+  const [settings, setSettings] = useState(initialSettings);
   const profileRef = useRef(null);
   const importInputRef = useRef(null);
 
@@ -356,6 +358,24 @@ function App() {
     };
 
     loadTransactions();
+  }, [isSignedIn]);
+
+  useEffect(() => {
+    if (!isSignedIn) return;
+
+    const loadSettings = async () => {
+      try {
+        const response = await fetch(SETTINGS_URL);
+        if (!response.ok) throw new Error("Could not load your settings.");
+        const savedSettings = await response.json();
+        setSettings(savedSettings);
+        setResetEmail(savedSettings.email);
+      } catch (err) {
+        setError(err.message);
+      }
+    };
+
+    loadSettings();
   }, [isSignedIn]);
 
   useEffect(() => {
@@ -769,6 +789,8 @@ function App() {
     setLoginForm({ username: "", password: "" });
     setNotice("");
     setTransactions([]);
+    setSettings(initialSettings);
+    setResetEmail("");
     setIsSignedIn(false);
     await fetch("/api/logout", { method: "POST" }).catch(() => {});
   };
@@ -779,10 +801,56 @@ function App() {
     setNotice(`Password reset instructions sent to ${resetEmail}.`);
   };
 
-  const saveSettings = (event) => {
+  const persistSettings = async (nextSettings, message = "Settings saved.") => {
+    const response = await fetch(SETTINGS_URL, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(nextSettings),
+    });
+    const result = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      const details = Array.isArray(result.details)
+        ? ` ${result.details.join(" ")}`
+        : "";
+      throw new Error(`${result.error || "Could not save settings."}${details}`);
+    }
+
+    setSettings(result);
+    setResetEmail(result.email);
+    setNotice(message);
+    return result;
+  };
+
+  const saveSettings = async (event) => {
     event.preventDefault();
-    setResetEmail(settings.email);
-    setNotice("Settings saved.");
+    setError("");
+    setNotice("");
+
+    try {
+      await persistSettings({
+        ...settings,
+        name: settings.name.trim(),
+        email: settings.email.trim(),
+      });
+    } catch (err) {
+      setError(err.message);
+    }
+  };
+
+  const savePreference = async (field, value) => {
+    const previousSettings = settings;
+    const nextSettings = { ...settings, [field]: value };
+    setSettings(nextSettings);
+    setError("");
+    setNotice("");
+
+    try {
+      await persistSettings(nextSettings, "Preferences saved.");
+    } catch (err) {
+      setSettings(previousSettings);
+      setError(err.message);
+    }
   };
 
   if (isCheckingSession) {
@@ -1461,10 +1529,7 @@ function App() {
                     type="checkbox"
                     checked={settings.weeklySummary}
                     onChange={(event) =>
-                      setSettings({
-                        ...settings,
-                        weeklySummary: event.target.checked,
-                      })
+                      savePreference("weeklySummary", event.target.checked)
                     }
                   />
                 </label>
@@ -1477,10 +1542,7 @@ function App() {
                     type="checkbox"
                     checked={settings.transactionAlerts}
                     onChange={(event) =>
-                      setSettings({
-                        ...settings,
-                        transactionAlerts: event.target.checked,
-                      })
+                      savePreference("transactionAlerts", event.target.checked)
                     }
                   />
                 </label>

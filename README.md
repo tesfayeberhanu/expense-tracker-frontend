@@ -5,6 +5,7 @@
 Configure these variables in Vercel for Production, Preview, and Development:
 
 - `API_BASE_URL`: upstream API base URL, without `/transactions`
+- `MONGO_URI`: MongoDB connection string used to persist dashboard settings
 - `LOGIN_USERNAME`: operator username
 - `LOGIN_PASSWORD`: a new strong password
 - `SESSION_SECRET`: at least 32 random bytes, used to sign session cookies
@@ -28,6 +29,8 @@ Requires a valid signed session:
 
 - `GET /api/session`
 - `POST /api/logout`
+- `GET /api/settings`
+- `PUT /api/settings`
 - `GET /api/transactions`
 - `POST /api/transactions`
 

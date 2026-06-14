@@ -6,6 +6,7 @@ import { createSessionCookie } from "../api/_auth.js";
 import login from "../api/login.js";
 import logout from "../api/logout.js";
 import session from "../api/session.js";
+import settings from "../api/settings.js";
 import transactions from "../api/transactions.js";
 
 process.env.LOGIN_USERNAME = "admin";
@@ -47,6 +48,7 @@ test("rejects unauthenticated private API requests", async () => {
   for (const [handler, apiRequest] of [
     [session, request("GET")],
     [logout, request("POST")],
+    [settings, request("GET")],
     [transactions, request("GET")],
   ]) {
     const apiResponse = response();
@@ -74,6 +76,7 @@ test("rejects cross-site state-changing requests", async () => {
   for (const [handler, apiRequest] of [
     [login, request("POST", crossSiteHeaders, {})],
     [logout, request("POST", crossSiteHeaders)],
+    [settings, request("PUT", crossSiteHeaders, {})],
     [transactions, request("POST", crossSiteHeaders, {})],
   ]) {
     const apiResponse = response();
