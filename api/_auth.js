@@ -85,3 +85,24 @@ export const sendJson = (response, status, body) => {
   response.setHeader("Cache-Control", "no-store");
   return response.status(status).json(body);
 };
+
+export const requireSameOrigin = (request, response) => {
+  const stateChangingMethods = new Set(["POST", "PUT", "PATCH", "DELETE"]);
+  if (!stateChangingMethods.has(request.method)) return true;
+
+  const origin = request.headers.origin;
+  const fetchSite = request.headers["sec-fetch-site"];
+  const host = request.headers["x-forwarded-host"] || request.headers.host;
+  const forwardedProtocol = request.headers["x-forwarded-proto"];
+  const protocol = forwardedProtocol?.split(",")[0]?.trim() || "https";
+
+  if (
+    fetchSite === "cross-site" ||
+    (origin && (!host || origin !== `${protocol}://${host}`))
+  ) {
+    sendJson(response, 403, { error: "Cross-site request rejected." });
+    return false;
+  }
+
+  return true;
+};

@@ -4,12 +4,13 @@
   "version": "0.0.0",
   "type": "module",
   "engines": {
-    "node": "^18.0.0 || >=20.0.0"
+    "node": "24.x"
   },
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint . --ext js,jsx --report-unused-disable-directives --max-warnings 0",
+    "test": "node --test",
     "preview": "vite preview"
   },
   "dependencies": {

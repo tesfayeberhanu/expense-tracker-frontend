@@ -1,6 +1,7 @@
 import {
   createSessionCookie,
   credentialsAreValid,
+  requireSameOrigin,
   sendJson,
 } from "./_auth.js";
 
@@ -9,6 +10,8 @@ export default function handler(request, response) {
     response.setHeader("Allow", "POST");
     return sendJson(response, 405, { error: "Method not allowed." });
   }
+
+  if (!requireSameOrigin(request, response)) return;
 
   try {
     const { username, password } = request.body ?? {};
@@ -23,4 +26,3 @@ export default function handler(request, response) {
     return sendJson(response, 500, { error: "Authentication is not configured." });
   }
 }
-

@@ -17,6 +17,22 @@ before deploying this version. The upstream API should also require its own
 authentication or restrict traffic to the serverless proxy; hiding its URL alone
 does not secure a publicly reachable API.
 
+## Public and protected routes
+
+Public:
+
+- `GET /` and static assets required to render the sign-in page
+- `POST /api/login`
+
+Requires a valid signed session:
+
+- `GET /api/session`
+- `POST /api/logout`
+- `GET /api/transactions`
+- `POST /api/transactions`
+
+State-changing API requests also reject cross-site origins.
+
 For local development with Vercel functions:
 
 ```sh

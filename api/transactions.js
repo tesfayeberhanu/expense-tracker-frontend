@@ -1,8 +1,10 @@
-import { hasValidSession, sendJson } from "./_auth.js";
+import { hasValidSession, requireSameOrigin, sendJson } from "./_auth.js";
 
 const ALLOWED_METHODS = new Set(["GET", "POST"]);
 
 export default async function handler(request, response) {
+  if (!requireSameOrigin(request, response)) return;
+
   if (!hasValidSession(request)) {
     return sendJson(response, 401, { error: "Authentication required." });
   }
