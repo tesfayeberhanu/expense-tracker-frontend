@@ -1,24 +1,36 @@
 import crypto from "node:crypto";
+import mongoose from "mongoose";
+import { connectDatabase } from "./_database.js";
+import { User } from "./_users.js";
 
 const SESSION_COOKIE = "lp_session";
 const SESSION_DURATION_SECONDS = 60 * 60 * 12;
 
-const encode = (value) => Buffer.from(value).toString("base64url");
+const SessionSchema = new mongoose.Schema(
+  {
+    tokenHash: {
+      type: String,
+      required: true,
+      unique: true,
+      select: false,
+    },
+    user: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+      index: true,
+    },
+    expiresAt: {
+      type: Date,
+      required: true,
+      expires: 0,
+    },
+  },
+  { timestamps: true, versionKey: false },
+);
 
-const sign = (value) => {
-  const secret = requireEnvironment("SESSION_SECRET");
-  if (Buffer.byteLength(secret) < 32) {
-    throw new Error("SESSION_SECRET must be at least 32 bytes.");
-  }
-
-  return crypto.createHmac("sha256", secret).update(value).digest("base64url");
-};
-
-const requireEnvironment = (name) => {
-  const value = process.env[name];
-  if (!value) throw new Error(`${name} is not configured.`);
-  return value;
-};
+const Session =
+  mongoose.models.Session || mongoose.model("Session", SessionSchema);
 
 const parseCookies = (header = "") =>
   Object.fromEntries(
@@ -29,56 +41,54 @@ const parseCookies = (header = "") =>
       .map(([name, ...value]) => [name, decodeURIComponent(value.join("="))]),
   );
 
-const safeEqual = (actual, expected) => {
-  const actualBuffer = Buffer.from(actual);
-  const expectedBuffer = Buffer.from(expected);
+const tokenHash = (token) =>
+  crypto.createHash("sha256").update(token).digest("base64url");
 
-  return (
-    actualBuffer.length === expectedBuffer.length &&
-    crypto.timingSafeEqual(actualBuffer, expectedBuffer)
-  );
-};
+const sessionToken = (request) =>
+  parseCookies(request.headers.cookie)[SESSION_COOKIE];
 
-export const credentialsAreValid = (username, password) => {
-  const usernameMatches = safeEqual(
-    String(username ?? ""),
-    requireEnvironment("LOGIN_USERNAME"),
-  );
-  const passwordMatches = safeEqual(
-    String(password ?? ""),
-    requireEnvironment("LOGIN_PASSWORD"),
-  );
-
-  return usernameMatches && passwordMatches;
-};
-
-export const createSessionCookie = () => {
-  const payload = encode(
-    JSON.stringify({ expiresAt: Date.now() + SESSION_DURATION_SECONDS * 1000 }),
-  );
-  const token = `${payload}.${sign(payload)}`;
-
+export const createSessionCookie = async (userId) => {
+  const token = crypto.randomBytes(32).toString("base64url");
+  await Session.create({
+    tokenHash: tokenHash(token),
+    user: userId,
+    expiresAt: new Date(Date.now() + SESSION_DURATION_SECONDS * 1000),
+  });
   return `${SESSION_COOKIE}=${token}; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=${SESSION_DURATION_SECONDS}`;
 };
 
 export const clearSessionCookie = () =>
   `${SESSION_COOKIE}=; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=0`;
 
-export const hasValidSession = (request) => {
+export const getValidSession = async (request) => {
   try {
-    const token = parseCookies(request.headers.cookie)[SESSION_COOKIE];
-    if (!token) return false;
+    const token = sessionToken(request);
+    if (!token) return null;
 
-    const [payload, signature] = token.split(".");
-    if (!payload || !signature || !safeEqual(signature, sign(payload))) {
-      return false;
+    await connectDatabase();
+    const session = await Session.findOne({
+      tokenHash: tokenHash(token),
+      expiresAt: { $gt: new Date() },
+    }).lean();
+    if (!session || !(await User.exists({ _id: session.user, active: true }))) {
+      return null;
     }
 
-    const session = JSON.parse(Buffer.from(payload, "base64url").toString());
-    return Number(session.expiresAt) > Date.now();
+    return session;
   } catch {
-    return false;
+    return null;
   }
+};
+
+export const hasValidSession = async (request) =>
+  Boolean(await getValidSession(request));
+
+export const deleteSession = async (request) => {
+  const token = sessionToken(request);
+  if (!token) return;
+
+  await connectDatabase();
+  await Session.deleteOne({ tokenHash: tokenHash(token) });
 };
 
 export const sendJson = (response, status, body) => {

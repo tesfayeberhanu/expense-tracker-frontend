@@ -16,7 +16,7 @@ export default async function handler(request, response) {
   if (!requireApiRequest(request, response)) return;
   if (!requireSameOrigin(request, response)) return;
 
-  if (!hasValidSession(request)) {
+  if (!(await hasValidSession(request))) {
     return sendJson(response, 401, { error: "Authentication required." });
   }
 

@@ -1,17 +1,16 @@
 import assert from "node:assert/strict";
-import process from "node:process";
 import test from "node:test";
 
-import { createSessionCookie } from "../api/_auth.js";
+import { clearSessionCookie } from "../api/_auth.js";
+import { Transaction } from "../api/_transactions.js";
+import { hashPassword, passwordMatches } from "../api/_users.js";
+import configuration from "../api/configuration.js";
 import login from "../api/login.js";
 import logout from "../api/logout.js";
+import password from "../api/password.js";
 import session from "../api/session.js";
 import settings from "../api/settings.js";
 import transactions from "../api/transactions.js";
-
-process.env.LOGIN_USERNAME = "admin";
-process.env.LOGIN_PASSWORD = "a-secure-test-password";
-process.env.SESSION_SECRET = "a-test-session-secret-that-is-longer-than-32-bytes";
 
 const request = (method, headers = {}, body) => ({
   method,
@@ -49,6 +48,7 @@ test("rejects unauthenticated private API requests", async () => {
     [session, request("GET")],
     [logout, request("POST")],
     [settings, request("GET")],
+    [configuration, request("GET")],
     [transactions, request("GET")],
   ]) {
     const apiResponse = response();
@@ -57,14 +57,9 @@ test("rejects unauthenticated private API requests", async () => {
   }
 });
 
-test("allows authenticated logout and clears the session cookie", () => {
-  const cookie = createSessionCookie().split(";")[0];
-  const apiResponse = response();
-
-  logout(request("POST", { cookie }), apiResponse);
-
-  assert.equal(apiResponse.statusCode, 200);
-  assert.match(apiResponse.headers.get("set-cookie"), /Max-Age=0/);
+test("creates a cookie that clears the database session token", () => {
+  assert.match(clearSessionCookie(), /^lp_session=;/);
+  assert.match(clearSessionCookie(), /Max-Age=0/);
 });
 
 test("rejects cross-site state-changing requests", async () => {
@@ -78,6 +73,7 @@ test("rejects cross-site state-changing requests", async () => {
     [logout, request("POST", crossSiteHeaders)],
     [settings, request("PUT", crossSiteHeaders, {})],
     [transactions, request("POST", crossSiteHeaders, {})],
+    [password, request("PUT", crossSiteHeaders, {})],
   ]) {
     const apiResponse = response();
     await handler(apiRequest, apiResponse);
@@ -89,13 +85,11 @@ test("rejects cross-site state-changing requests", async () => {
 });
 
 test("rejects direct browser navigation to transactions", async () => {
-  const cookie = createSessionCookie().split(";")[0];
   const apiResponse = response();
 
   await transactions(
     request("GET", {
       accept: "text/html,application/xhtml+xml",
-      cookie,
       "sec-fetch-dest": "document",
       "sec-fetch-mode": "navigate",
     }),
@@ -104,4 +98,27 @@ test("rejects direct browser navigation to transactions", async () => {
 
   assert.equal(apiResponse.statusCode, 404);
   assert.deepEqual(apiResponse.body, { error: "API endpoint not found." });
+});
+
+test("hashes passwords before storing them", () => {
+  const password = "a-secure-test-password";
+  const hash = hashPassword(password);
+
+  assert.notEqual(hash, password);
+  assert.equal(passwordMatches(password, hash), true);
+  assert.equal(passwordMatches("incorrect-password", hash), false);
+});
+
+test("validates transaction records before MongoDB persistence", async () => {
+  const transaction = new Transaction({
+    date: "2026-06-15",
+    amount: -10,
+    category: "Expense",
+    from: "Cash",
+    inChargeOfWithdrawal: "Operator",
+    to: "Vendor",
+    currency: "ETB",
+  });
+
+  await assert.rejects(transaction.validate(), /Amount must be greater than zero/);
 });

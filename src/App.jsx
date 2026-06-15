@@ -5,6 +5,7 @@ import lpLogo from "./assets/lp-logo.png";
 
 const API_URL = "/api/transactions";
 const SETTINGS_URL = "/api/settings";
+const CONFIGURATION_URL = "/api/configuration";
 const initialSettings = {
   name: "LP Finance",
   email: "",
@@ -12,18 +13,10 @@ const initialSettings = {
   transactionAlerts: true,
 };
 
-const pipelines = [
-  "Cash",
-  "Lite",
-  "Habesha",
-  "Best",
-  "Speed",
-  "Santim",
-  "Dash",
-  "Dama",
-];
-
-const currencies = ["ETB", "USD", "USDT"];
+const initialConfiguration = {
+  pipelines: ["Cash", "Lite", "Habesha", "Best", "Speed", "Santim", "Dash", "Dama"],
+  currencies: ["ETB", "USD", "USDT"],
+};
 
 const initialTransactionForm = {
   date: new Date().toISOString().split("T")[0],
@@ -218,7 +211,7 @@ function TransactionList({ transactions, isLoading }) {
   });
 }
 
-function TransactionTypeSummaryCards({ summary, reportTotals }) {
+function TransactionTypeSummaryCards({ summary, reportTotals, currencies }) {
   const cards = [
     {
       type: "Expense",
@@ -322,10 +315,17 @@ function App() {
   const [notice, setNotice] = useState("");
   const [profileOpen, setProfileOpen] = useState(false);
   const [resetOpen, setResetOpen] = useState(false);
-  const [resetEmail, setResetEmail] = useState("");
+  const [passwordForm, setPasswordForm] = useState({
+    currentPassword: "",
+    newPassword: "",
+    confirmPassword: "",
+  });
+  const [isPasswordSaving, setIsPasswordSaving] = useState(false);
   const [settings, setSettings] = useState(initialSettings);
+  const [configuration, setConfiguration] = useState(initialConfiguration);
   const profileRef = useRef(null);
   const importInputRef = useRef(null);
+  const { pipelines, currencies } = configuration;
 
   useEffect(() => {
     const restoreSession = async () => {
@@ -369,13 +369,38 @@ function App() {
         if (!response.ok) throw new Error("Could not load your settings.");
         const savedSettings = await response.json();
         setSettings(savedSettings);
-        setResetEmail(savedSettings.email);
       } catch (err) {
         setError(err.message);
       }
     };
 
     loadSettings();
+  }, [isSignedIn]);
+
+  useEffect(() => {
+    if (!isSignedIn) return;
+
+    const loadConfiguration = async () => {
+      try {
+        const response = await fetch(CONFIGURATION_URL);
+        if (!response.ok) throw new Error("Could not load configuration.");
+        const savedConfiguration = await response.json();
+        setConfiguration(savedConfiguration);
+        setTransactionForm((current) => ({
+          ...current,
+          from: savedConfiguration.pipelines.includes(current.from)
+            ? current.from
+            : savedConfiguration.pipelines[0],
+          currency: savedConfiguration.currencies.includes(current.currency)
+            ? current.currency
+            : savedConfiguration.currencies[0],
+        }));
+      } catch (err) {
+        setError(err.message);
+      }
+    };
+
+    loadConfiguration();
   }, [isSignedIn]);
 
   useEffect(() => {
@@ -458,7 +483,7 @@ function App() {
         };
         return summary;
       }, {}),
-    [filteredTransactions],
+    [currencies, filteredTransactions],
   );
 
   const operatorSummary = useMemo(() => {
@@ -506,7 +531,7 @@ function App() {
         expenses: totalsFor("Expense"),
       };
     });
-  }, [filteredTransactions]);
+  }, [currencies, filteredTransactions, pipelines]);
 
   const dailySummary = useMemo(() => {
     const summaries = filteredTransactions.reduce((byDate, transaction) => {
@@ -790,15 +815,53 @@ function App() {
     setNotice("");
     setTransactions([]);
     setSettings(initialSettings);
-    setResetEmail("");
+    setConfiguration(initialConfiguration);
+    setPasswordForm({
+      currentPassword: "",
+      newPassword: "",
+      confirmPassword: "",
+    });
     setIsSignedIn(false);
     await fetch("/api/logout", { method: "POST" }).catch(() => {});
   };
 
-  const handlePasswordReset = (event) => {
+  const handlePasswordChange = async (event) => {
     event.preventDefault();
-    setResetOpen(false);
-    setNotice(`Password reset instructions sent to ${resetEmail}.`);
+    setError("");
+    setNotice("");
+
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      setError("New passwords do not match.");
+      return;
+    }
+
+    setIsPasswordSaving(true);
+    try {
+      const response = await fetch("/api/password", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          currentPassword: passwordForm.currentPassword,
+          newPassword: passwordForm.newPassword,
+        }),
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        throw new Error(result.error || "Could not update password.");
+      }
+
+      setPasswordForm({
+        currentPassword: "",
+        newPassword: "",
+        confirmPassword: "",
+      });
+      setResetOpen(false);
+      setNotice("Password updated successfully.");
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setIsPasswordSaving(false);
+    }
   };
 
   const persistSettings = async (nextSettings, message = "Settings saved.") => {
@@ -817,7 +880,6 @@ function App() {
     }
 
     setSettings(result);
-    setResetEmail(result.email);
     setNotice(message);
     return result;
   };
@@ -1001,7 +1063,7 @@ function App() {
                       setProfileOpen(false);
                     }}
                   >
-                    ✉ Reset password
+                    ● Change password
                   </button>
                   <button
                     className="signout"
@@ -1113,7 +1175,10 @@ function App() {
 
         {activeSection === "overview" && (
           <>
-            <TransactionTypeSummaryCards summary={currencySummary} />
+            <TransactionTypeSummaryCards
+              summary={currencySummary}
+              currencies={currencies}
+            />
             <div className="content-grid">
               <section className="panel transaction-panel">
                 <div className="panel-heading">
@@ -1379,6 +1444,7 @@ function App() {
             <TransactionTypeSummaryCards
               summary={currencySummary}
               reportTotals={reportCardTotals}
+              currencies={currencies}
             />
             <section className="panel monthly-leaders-panel">
               <div className="panel-heading">
@@ -1549,9 +1615,16 @@ function App() {
                 <button
                   className="secondary-button"
                   type="button"
-                  onClick={() => setResetOpen(true)}
+                  onClick={() => {
+                    setPasswordForm({
+                      currentPassword: "",
+                      newPassword: "",
+                      confirmPassword: "",
+                    });
+                    setResetOpen(true);
+                  }}
                 >
-                  Send password reset email
+                  Change password
                 </button>
               </div>
             </div>
@@ -1579,20 +1652,63 @@ function App() {
             >
               ×
             </button>
-            <div className="modal-icon">✉</div>
-            <h2 id="reset-title">Reset your password</h2>
-            <p>We’ll send password reset instructions to your email address.</p>
-            <form onSubmit={handlePasswordReset}>
-              <label htmlFor="reset-email">Email address</label>
+            <div className="modal-icon">●</div>
+            <h2 id="reset-title">Change your password</h2>
+            <p>Your new password must contain between 12 and 256 characters.</p>
+            <form onSubmit={handlePasswordChange}>
+              <label htmlFor="current-password">Current password</label>
               <input
-                id="reset-email"
-                type="email"
+                id="current-password"
+                type="password"
+                autoComplete="current-password"
                 required
-                value={resetEmail}
-                onChange={(event) => setResetEmail(event.target.value)}
+                value={passwordForm.currentPassword}
+                onChange={(event) =>
+                  setPasswordForm({
+                    ...passwordForm,
+                    currentPassword: event.target.value,
+                  })
+                }
               />
-              <button className="submit-button" type="submit">
-                Send reset email <span>→</span>
+              <label htmlFor="new-password">New password</label>
+              <input
+                id="new-password"
+                type="password"
+                autoComplete="new-password"
+                minLength="12"
+                maxLength="256"
+                required
+                value={passwordForm.newPassword}
+                onChange={(event) =>
+                  setPasswordForm({
+                    ...passwordForm,
+                    newPassword: event.target.value,
+                  })
+                }
+              />
+              <label htmlFor="confirm-password">Confirm new password</label>
+              <input
+                id="confirm-password"
+                type="password"
+                autoComplete="new-password"
+                minLength="12"
+                maxLength="256"
+                required
+                value={passwordForm.confirmPassword}
+                onChange={(event) =>
+                  setPasswordForm({
+                    ...passwordForm,
+                    confirmPassword: event.target.value,
+                  })
+                }
+              />
+              <button
+                className="submit-button"
+                type="submit"
+                disabled={isPasswordSaving}
+              >
+                {isPasswordSaving ? "Updating..." : "Update password"}{" "}
+                <span>→</span>
               </button>
             </form>
           </section>
