@@ -17,6 +17,10 @@ password hash if that username does not already exist. After the user exists,
 the bootstrap variables are no longer used for authentication and can be
 removed. Passwords can be changed from Settings.
 
+For account recovery, temporarily set `BOOTSTRAP_REPLACE_USERNAME` to an
+existing username alongside new bootstrap credentials. The next login renames
+that account and resets its password. Remove all bootstrap variables afterward.
+
 Transactions previously stored by an upstream `API_BASE_URL` are not migrated
 automatically. Export them to CSV from the old deployment and import that CSV
 after deploying this version.

@@ -90,13 +90,30 @@ export const passwordMatches = (password, storedHash = "") => {
 export const ensureBootstrapUser = async () => {
   const username = normalizeUsername(process.env.BOOTSTRAP_USERNAME);
   const password = process.env.BOOTSTRAP_PASSWORD;
+  const replaceUsername = normalizeUsername(process.env.BOOTSTRAP_REPLACE_USERNAME);
   if (!username && !password) return;
   if (!username || !password) {
     throw new Error(
       "BOOTSTRAP_USERNAME and BOOTSTRAP_PASSWORD must both be configured.",
     );
   }
-  if (await User.exists({ username })) return;
+  validateUsername(username);
+  validatePassword(password);
+
+  const existingUser = await User.findOne({ username });
+  if (existingUser) return;
+
+  if (replaceUsername && replaceUsername !== username) {
+    validateUsername(replaceUsername);
+    const replacementUser = await User.findOne({ username: replaceUsername });
+    if (replacementUser) {
+      replacementUser.username = username;
+      replacementUser.passwordHash = hashPassword(password);
+      replacementUser.active = true;
+      await replacementUser.save();
+      return;
+    }
+  }
 
   try {
     await User.create({ username, passwordHash: hashPassword(password) });
