@@ -5,16 +5,17 @@
 Configure these variables in Vercel for Production, Preview, and Development:
 
 - `MONGO_URI`: MongoDB connection string used for all persisted application data
-- `BOOTSTRAP_USERNAME`: username used only to create the first database user
-- `BOOTSTRAP_PASSWORD`: password used only to create the first database user;
+- `BOOTSTRAP_USERNAME`: username used only to create a database user
+- `BOOTSTRAP_PASSWORD`: password used only to create that database user;
   it must contain between 12 and 256 characters
 
 Do not prefix any of these with `VITE_`. Vite exposes every `VITE_*` value in
 the browser bundle.
 
-On the first login, the app creates a user in MongoDB with a scrypt password
-hash. After that first user exists, the bootstrap variables are no longer used
-for authentication and can be removed. Passwords can be changed from Settings.
+When configured, the app creates the bootstrap user in MongoDB with a scrypt
+password hash if that username does not already exist. After the user exists,
+the bootstrap variables are no longer used for authentication and can be
+removed. Passwords can be changed from Settings.
 
 Transactions previously stored by an upstream `API_BASE_URL` are not migrated
 automatically. Export them to CSV from the old deployment and import that CSV

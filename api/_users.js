@@ -69,15 +69,15 @@ export const passwordMatches = (password, storedHash = "") => {
 };
 
 export const ensureBootstrapUser = async () => {
-  if ((await User.countDocuments()) > 0) return;
-
   const username = normalizeUsername(process.env.BOOTSTRAP_USERNAME);
   const password = process.env.BOOTSTRAP_PASSWORD;
+  if (!username && !password) return;
   if (!username || !password) {
     throw new Error(
-      "BOOTSTRAP_USERNAME and BOOTSTRAP_PASSWORD are required to create the first user.",
+      "BOOTSTRAP_USERNAME and BOOTSTRAP_PASSWORD must both be configured.",
     );
   }
+  if (await User.exists({ username })) return;
 
   try {
     await User.create({ username, passwordHash: hashPassword(password) });
