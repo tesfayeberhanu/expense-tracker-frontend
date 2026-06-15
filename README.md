@@ -46,6 +46,7 @@ Requires a valid database-backed session:
 - `GET /api/transactions`
 - `POST /api/transactions`
 - `PUT /api/password`
+- `PUT /api/username`
 
 State-changing API requests also reject cross-site origins.
 Direct browser navigation to `/api/transactions` is rejected; authenticated

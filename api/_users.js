@@ -3,6 +3,8 @@ import mongoose from "mongoose";
 
 const MINIMUM_PASSWORD_LENGTH = 12;
 const MAXIMUM_PASSWORD_LENGTH = 256;
+const MINIMUM_USERNAME_LENGTH = 2;
+const MAXIMUM_USERNAME_LENGTH = 120;
 const SCRYPT_KEY_LENGTH = 64;
 
 const UserSchema = new mongoose.Schema(
@@ -13,7 +15,9 @@ const UserSchema = new mongoose.Schema(
       unique: true,
       trim: true,
       lowercase: true,
-      maxlength: 120,
+      minlength: MINIMUM_USERNAME_LENGTH,
+      maxlength: MAXIMUM_USERNAME_LENGTH,
+      match: /^[a-z0-9._-]+$/i,
     },
     passwordHash: {
       type: String,
@@ -32,6 +36,21 @@ export const User =
   mongoose.models.User || mongoose.model("User", UserSchema);
 
 const normalizeUsername = (username) => String(username ?? "").trim().toLowerCase();
+
+export const validateUsername = (username) => {
+  const normalized = normalizeUsername(username);
+  if (
+    normalized.length < MINIMUM_USERNAME_LENGTH ||
+    normalized.length > MAXIMUM_USERNAME_LENGTH ||
+    !/^[a-z0-9._-]+$/.test(normalized)
+  ) {
+    throw new Error(
+      "Username must contain 2 to 120 letters, numbers, periods, underscores, or hyphens.",
+    );
+  }
+
+  return normalized;
+};
 
 export const validatePassword = (password) => {
   const length = String(password ?? "").length;
@@ -106,4 +125,17 @@ export const changeUserPassword = async (userId, currentPassword, newPassword) =
   user.passwordHash = hashPassword(newPassword);
   await user.save();
   return true;
+};
+
+export const changeUserUsername = async (userId, currentPassword, newUsername) => {
+  const username = validateUsername(newUsername);
+  const user = await User.findById(userId).select("+passwordHash");
+
+  if (!user || !user.active || !passwordMatches(currentPassword, user.passwordHash)) {
+    return null;
+  }
+
+  user.username = username;
+  await user.save();
+  return user.username;
 };

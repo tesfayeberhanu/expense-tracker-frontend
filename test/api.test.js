@@ -3,7 +3,7 @@ import test from "node:test";
 
 import { clearSessionCookie } from "../api/_auth.js";
 import { Transaction } from "../api/_transactions.js";
-import { hashPassword, passwordMatches } from "../api/_users.js";
+import { hashPassword, passwordMatches, validateUsername } from "../api/_users.js";
 import configuration from "../api/configuration.js";
 import login from "../api/login.js";
 import logout from "../api/logout.js";
@@ -11,6 +11,7 @@ import password from "../api/password.js";
 import session from "../api/session.js";
 import settings from "../api/settings.js";
 import transactions from "../api/transactions.js";
+import username from "../api/username.js";
 
 const request = (method, headers = {}, body) => ({
   method,
@@ -74,6 +75,7 @@ test("rejects cross-site state-changing requests", async () => {
     [settings, request("PUT", crossSiteHeaders, {})],
     [transactions, request("POST", crossSiteHeaders, {})],
     [password, request("PUT", crossSiteHeaders, {})],
+    [username, request("PUT", crossSiteHeaders, {})],
   ]) {
     const apiResponse = response();
     await handler(apiRequest, apiResponse);
@@ -107,6 +109,11 @@ test("hashes passwords before storing them", () => {
   assert.notEqual(hash, password);
   assert.equal(passwordMatches(password, hash), true);
   assert.equal(passwordMatches("incorrect-password", hash), false);
+});
+
+test("normalizes and validates usernames", () => {
+  assert.equal(validateUsername(" Leo "), "leo");
+  assert.throws(() => validateUsername("not allowed"), /Username must contain/);
 });
 
 test("validates transaction records before MongoDB persistence", async () => {
