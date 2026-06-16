@@ -1,37 +1,17 @@
 # LP Finance
 
-## Private environment variables
+## Frontend and API
 
-Configure these variables in Vercel for Production, Preview, and Development:
+This repository is the Vite/React frontend only.
 
-- `MONGO_URI`: MongoDB connection string used for all persisted application data
-- `BOOTSTRAP_USERNAME`: username used only to create a database user
-- `BOOTSTRAP_PASSWORD`: password used only to create that database user;
-  it must contain between 12 and 256 characters
+The backend API is hosted separately on DigitalOcean App Platform from the
+`tesfayeberhanu/expense-tracker-backend` repository. Vercel rewrites `/api/*`
+requests to that DigitalOcean backend, so the browser continues to call
+same-origin URLs such as `/api/login` and `/api/transactions`.
 
-Do not prefix any of these with `VITE_`. Vite exposes every `VITE_*` value in
-the browser bundle.
-
-When configured, the app creates the bootstrap user in MongoDB with a scrypt
-password hash if that username does not already exist. After the user exists,
-the bootstrap variables are no longer used for authentication and can be
-removed. Passwords can be changed from Settings.
-
-For account recovery, temporarily set `BOOTSTRAP_REPLACE_USERNAME` to an
-existing username alongside new bootstrap credentials. The next login renames
-that account and resets its password. Remove all bootstrap variables afterward.
-
-Transactions previously stored by an upstream `API_BASE_URL` are not migrated
-automatically. Export them to CSV from the old deployment and import that CSV
-after deploying this version.
-
-MongoDB collections:
-
-- `transactions`: transaction records
-- `dashboardsettings`: profile and notification settings
-- `dashboardconfigurations`: operator/pipeline and currency lists
-- `users`: usernames and password hashes
-- `sessions`: active login sessions with automatic expiration
+No frontend environment variables are required. MongoDB credentials and other
+backend-only secrets belong in the DigitalOcean backend app, never in Vercel for
+this frontend.
 
 ## Public and protected routes
 
@@ -56,9 +36,9 @@ State-changing API requests also reject cross-site origins.
 Direct browser navigation to `/api/transactions` is rejected; authenticated
 dashboard requests continue to use the endpoint normally.
 
-For local development with Vercel functions:
+For local frontend development:
 
 ```sh
-cp .env.example .env.local
-vercel dev
+npm install
+npm run dev
 ```
