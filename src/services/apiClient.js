@@ -1,6 +1,11 @@
 import axios from "axios";
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "/api/";
+const configuredBaseUrl = import.meta.env.VITE_API_BASE_URL;
+const isExternalApiUrl = /^https?:\/\//i.test(configuredBaseUrl || "");
+const API_BASE_URL =
+  import.meta.env.PROD && isExternalApiUrl
+    ? "/api/"
+    : configuredBaseUrl || "/api/";
 
 const getErrorMessage = (error) => {
   const data = error.response?.data;
