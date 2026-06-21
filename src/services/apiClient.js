@@ -1,11 +1,10 @@
 import axios from "axios";
 
-const configuredBaseUrl = import.meta.env.VITE_API_BASE_URL;
-const isExternalApiUrl = /^https?:\/\//i.test(configuredBaseUrl || "");
-const API_BASE_URL =
-  import.meta.env.PROD && isExternalApiUrl
-    ? "/api/"
-    : configuredBaseUrl || "/api/";
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL?.trim();
+
+if (!API_BASE_URL) {
+  throw new Error("VITE_API_BASE_URL is required.");
+}
 
 const getErrorMessage = (error) => {
   const data = error.response?.data;
