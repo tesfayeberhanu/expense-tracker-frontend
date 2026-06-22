@@ -21,7 +21,14 @@ const pageMap = {
 };
 
 export default function AppShell() {
-  const { activeSection, error, notice, setError, setNotice } = useFinance();
+  const {
+    activeSection,
+    canViewTransactions,
+    error,
+    notice,
+    setError,
+    setNotice,
+  } = useFinance();
   const ActivePage = pageMap[activeSection] || OverviewPage;
 
   return (
@@ -38,7 +45,7 @@ export default function AppShell() {
           type="success"
         />
 
-        {activeSection !== "settings" && <DateFilter />}
+        {canViewTransactions && activeSection !== "settings" && <DateFilter />}
         <ActivePage />
       </main>
 

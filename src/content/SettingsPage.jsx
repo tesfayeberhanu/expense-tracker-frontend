@@ -2,6 +2,7 @@ import { useFinance } from "../context";
 
 export default function SettingsPage() {
   const {
+    canUpdateSettings,
     savePreference,
     saveSettings,
     setPasswordForm,
@@ -24,6 +25,7 @@ export default function SettingsPage() {
           <input
             id="name"
             value={settings.name}
+            disabled={!canUpdateSettings}
             onChange={(event) =>
               setSettings({ ...settings, name: event.target.value })
             }
@@ -33,11 +35,16 @@ export default function SettingsPage() {
             id="email"
             type="email"
             value={settings.email}
+            disabled={!canUpdateSettings}
             onChange={(event) =>
               setSettings({ ...settings, email: event.target.value })
             }
           />
-          <button className="submit-button" type="submit">
+          <button
+            className="submit-button"
+            type="submit"
+            disabled={!canUpdateSettings}
+          >
             Save changes <span>→</span>
           </button>
         </div>
@@ -58,6 +65,7 @@ export default function SettingsPage() {
             <input
               type="checkbox"
               checked={settings.weeklySummary}
+              disabled={!canUpdateSettings}
               onChange={(event) =>
                 savePreference("weeklySummary", event.target.checked)
               }
@@ -71,6 +79,7 @@ export default function SettingsPage() {
             <input
               type="checkbox"
               checked={settings.transactionAlerts}
+              disabled={!canUpdateSettings}
               onChange={(event) =>
                 savePreference("transactionAlerts", event.target.checked)
               }

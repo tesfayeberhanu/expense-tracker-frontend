@@ -1,13 +1,16 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   createInitialTransactionForm,
   csvColumns,
+  defaultOperatorPermissions,
   initialConfiguration,
   initialSettings,
+  navItems,
 } from "../content";
 import {
   authService,
   configurationService,
+  operatorsService,
   settingsService,
   transactionsService,
 } from "../services";
@@ -31,6 +34,18 @@ const createInitialDateFilter = () => ({
   to: "",
 });
 
+const createInitialOperatorForm = (permissions = []) => ({
+  username: "",
+  password: "",
+  active: true,
+  permissions: defaultOperatorPermissions.filter((permission) =>
+    permissions.includes(permission),
+  ),
+});
+
+const sortOperators = (operators) =>
+  [...operators].sort((a, b) => a.username.localeCompare(b.username));
+
 const getErrorMessage = (err, fallback) => {
   const details = Array.isArray(err?.details) ? ` ${err.details.join(" ")}` : "";
   return `${err?.message || fallback}${details}`;
@@ -38,6 +53,7 @@ const getErrorMessage = (err, fallback) => {
 
 export function FinanceProvider({ children }) {
   const [isSignedIn, setIsSignedIn] = useState(false);
+  const [currentUser, setCurrentUser] = useState(null);
   const [isCheckingSession, setIsCheckingSession] = useState(true);
   const [loginForm, setLoginForm] = useState({ username: "", password: "" });
   const [loginError, setLoginError] = useState("");
@@ -50,6 +66,8 @@ export function FinanceProvider({ children }) {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
+  const [isOperatorsLoading, setIsOperatorsLoading] = useState(false);
+  const [isOperatorSaving, setIsOperatorSaving] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [resetOpen, setResetOpen] = useState(false);
@@ -61,14 +79,52 @@ export function FinanceProvider({ children }) {
   const [isPasswordSaving, setIsPasswordSaving] = useState(false);
   const [settings, setSettings] = useState(initialSettings);
   const [configuration, setConfiguration] = useState(initialConfiguration);
+  const [operatorPermissions, setOperatorPermissions] = useState([]);
+  const [operators, setOperators] = useState([]);
+  const [operatorForm, setOperatorForm] = useState(() =>
+    createInitialOperatorForm(),
+  );
+  const [editingOperatorId, setEditingOperatorId] = useState("");
   const importInputRef = useRef(null);
   const { pipelines, currencies } = configuration;
+
+  const hasPermission = useCallback(
+    (permission) =>
+      currentUser?.role === "admin" ||
+      Boolean(currentUser?.permissions?.includes(permission)),
+    [currentUser],
+  );
+
+  const hasAnyPermission = useCallback(
+    (permissions = []) =>
+      !permissions.length || permissions.some((permission) => hasPermission(permission)),
+    [hasPermission],
+  );
+
+  const visibleNavItems = useMemo(
+    () => navItems.filter((item) => hasAnyPermission(item.permissions || [])),
+    [hasAnyPermission],
+  );
+
+  const canCreateTransactions = hasPermission("transactions:create");
+  const canManageOperators = hasPermission("operators:manage");
+  const canReadConfiguration = hasPermission("configuration:read");
+  const canReadSettings = hasPermission("settings:read");
+  const canUpdateSettings = hasPermission("settings:update");
+  const canViewReports = hasPermission("reports:view");
+  const canViewTransactions = hasAnyPermission([
+    "transactions:read",
+    "reports:view",
+  ]);
 
   useEffect(() => {
     const restoreSession = async () => {
       try {
-        setIsSignedIn(await authService.checkSession());
+        const session = await authService.checkSession();
+        setCurrentUser(session?.user || null);
+        setIsSignedIn(Boolean(session?.authenticated));
       } catch {
+        setCurrentUser(null);
         setIsSignedIn(false);
       } finally {
         setIsCheckingSession(false);
@@ -79,7 +135,15 @@ export function FinanceProvider({ children }) {
   }, []);
 
   useEffect(() => {
-    if (!isSignedIn) {
+    if (!isSignedIn) return;
+    if (visibleNavItems.some((item) => item.id === activeSection)) return;
+
+    setActiveSection(visibleNavItems[0]?.id || "overview");
+  }, [activeSection, isSignedIn, visibleNavItems]);
+
+  useEffect(() => {
+    if (!isSignedIn || !canViewTransactions) {
+      setTransactions([]);
       setIsLoading(false);
       return;
     }
@@ -104,10 +168,13 @@ export function FinanceProvider({ children }) {
     return () => {
       isCurrent = false;
     };
-  }, [isSignedIn]);
+  }, [canViewTransactions, isSignedIn]);
 
   useEffect(() => {
-    if (!isSignedIn) return;
+    if (!isSignedIn || !canReadSettings) {
+      setSettings(initialSettings);
+      return;
+    }
 
     let isCurrent = true;
 
@@ -126,10 +193,13 @@ export function FinanceProvider({ children }) {
     return () => {
       isCurrent = false;
     };
-  }, [isSignedIn]);
+  }, [canReadSettings, isSignedIn]);
 
   useEffect(() => {
-    if (!isSignedIn) return;
+    if (!isSignedIn || !canReadConfiguration) {
+      setConfiguration(initialConfiguration);
+      return;
+    }
 
     let isCurrent = true;
 
@@ -159,7 +229,51 @@ export function FinanceProvider({ children }) {
     return () => {
       isCurrent = false;
     };
-  }, [isSignedIn]);
+  }, [canReadConfiguration, isSignedIn]);
+
+  useEffect(() => {
+    if (!isSignedIn || !canManageOperators) {
+      setOperators([]);
+      setOperatorPermissions([]);
+      setOperatorForm(createInitialOperatorForm());
+      setEditingOperatorId("");
+      setIsOperatorsLoading(false);
+      return;
+    }
+
+    let isCurrent = true;
+
+    const loadOperators = async () => {
+      setIsOperatorsLoading(true);
+      try {
+        const data = await operatorsService.getOperators();
+        if (!isCurrent) return;
+
+        const permissions = data.permissions || [];
+        setOperatorPermissions(permissions);
+        setOperators(sortOperators(data.operators || []));
+        setOperatorForm((current) => ({
+          ...current,
+          permissions: current.permissions.length
+            ? current.permissions.filter((permission) =>
+                permissions.includes(permission),
+              )
+            : createInitialOperatorForm(permissions).permissions,
+        }));
+      } catch (err) {
+        if (isCurrent) {
+          setError(getErrorMessage(err, "Could not load operators."));
+        }
+      } finally {
+        if (isCurrent) setIsOperatorsLoading(false);
+      }
+    };
+
+    loadOperators();
+    return () => {
+      isCurrent = false;
+    };
+  }, [canManageOperators, isSignedIn]);
 
   const filteredTransactions = useMemo(
     () => filterTransactionsByDate(transactions, dateFilter),
@@ -196,6 +310,11 @@ export function FinanceProvider({ children }) {
   const handleSubmit = async (event) => {
     event.preventDefault();
     setError("");
+    if (!canCreateTransactions) {
+      setError("You do not have permission to create transactions.");
+      return;
+    }
+
     if (
       !transactionForm.amount ||
       Number(transactionForm.amount) <= 0 ||
@@ -214,7 +333,9 @@ export function FinanceProvider({ children }) {
         to: transactionForm.to.trim(),
         notes: transactionForm.notes.trim(),
       });
-      setTransactions((current) => [savedTransaction, ...current]);
+      if (canViewTransactions) {
+        setTransactions((current) => [savedTransaction, ...current]);
+      }
       setTransactionForm((current) => ({
         ...createInitialTransactionForm(),
         date: current.date,
@@ -230,6 +351,8 @@ export function FinanceProvider({ children }) {
   };
 
   const openNewTransaction = () => {
+    if (!canCreateTransactions) return;
+
     setActiveSection("transactions");
     window.setTimeout(() => document.querySelector("#amount")?.focus(), 0);
   };
@@ -272,6 +395,11 @@ export function FinanceProvider({ children }) {
 
     setError("");
     setNotice("");
+    if (!canCreateTransactions) {
+      setError("You do not have permission to import transactions.");
+      return;
+    }
+
     setIsImporting(true);
 
     try {
@@ -320,7 +448,9 @@ export function FinanceProvider({ children }) {
 
       const savedTransactions =
         await transactionsService.createTransactions(importedTransactions);
-      setTransactions((current) => [...savedTransactions.reverse(), ...current]);
+      if (canViewTransactions) {
+        setTransactions((current) => [...savedTransactions.reverse(), ...current]);
+      }
       setNotice(`${savedTransactions.length} transactions imported successfully.`);
     } catch (err) {
       setError(getErrorMessage(err, "Could not import transactions."));
@@ -334,9 +464,10 @@ export function FinanceProvider({ children }) {
     setLoginError("");
 
     try {
-      await authService.signIn(loginForm);
+      const session = await authService.signIn(loginForm);
       setLoginForm({ username: "", password: "" });
-      setIsSignedIn(true);
+      setCurrentUser(session?.user || null);
+      setIsSignedIn(Boolean(session?.authenticated));
     } catch (err) {
       setLoginError(getErrorMessage(err, "Could not sign in."));
     }
@@ -348,6 +479,11 @@ export function FinanceProvider({ children }) {
     setTransactions([]);
     setSettings(initialSettings);
     setConfiguration(initialConfiguration);
+    setCurrentUser(null);
+    setOperators([]);
+    setOperatorPermissions([]);
+    setOperatorForm(createInitialOperatorForm());
+    setEditingOperatorId("");
     setPasswordForm({
       currentPassword: "",
       newPassword: "",
@@ -389,6 +525,10 @@ export function FinanceProvider({ children }) {
   };
 
   const persistSettings = async (nextSettings, message = "Settings saved.") => {
+    if (!canUpdateSettings) {
+      throw new Error("You do not have permission to update settings.");
+    }
+
     const savedSettings = await settingsService.updateSettings(nextSettings);
     setSettings(savedSettings);
     setNotice(message);
@@ -399,6 +539,11 @@ export function FinanceProvider({ children }) {
     event.preventDefault();
     setError("");
     setNotice("");
+
+    if (!canUpdateSettings) {
+      setError("You do not have permission to update settings.");
+      return;
+    }
 
     try {
       await persistSettings({
@@ -412,6 +557,11 @@ export function FinanceProvider({ children }) {
   };
 
   const savePreference = async (field, value) => {
+    if (!canUpdateSettings) {
+      setError("You do not have permission to update settings.");
+      return;
+    }
+
     const previousSettings = settings;
     const nextSettings = { ...settings, [field]: value };
     setSettings(nextSettings);
@@ -426,16 +576,135 @@ export function FinanceProvider({ children }) {
     }
   };
 
+  const resetOperatorForm = () => {
+    setEditingOperatorId("");
+    setOperatorForm(createInitialOperatorForm(operatorPermissions));
+  };
+
+  const startEditingOperator = (operator) => {
+    setEditingOperatorId(operator.id);
+    setOperatorForm({
+      username: operator.username,
+      password: "",
+      active: operator.active,
+      permissions: operator.permissions || [],
+    });
+  };
+
+  const toggleOperatorPermission = (permission, checked) => {
+    setOperatorForm((current) => ({
+      ...current,
+      permissions: checked
+        ? [...new Set([...current.permissions, permission])]
+        : current.permissions.filter((item) => item !== permission),
+    }));
+  };
+
+  const saveOperator = async (event) => {
+    event.preventDefault();
+    setError("");
+    setNotice("");
+
+    if (!canManageOperators) {
+      setError("You do not have permission to manage operators.");
+      return;
+    }
+
+    if (!operatorForm.username.trim()) {
+      setError("Operator username is required.");
+      return;
+    }
+
+    if (!editingOperatorId && !operatorForm.password) {
+      setError("Operator password is required.");
+      return;
+    }
+
+    setIsOperatorSaving(true);
+    try {
+      const payload = {
+        username: operatorForm.username.trim(),
+        active: operatorForm.active,
+        permissions: operatorForm.permissions,
+      };
+
+      if (operatorForm.password) payload.password = operatorForm.password;
+
+      const savedOperator = editingOperatorId
+        ? await operatorsService.updateOperator(editingOperatorId, payload)
+        : await operatorsService.createOperator(payload);
+
+      setOperators((current) =>
+        sortOperators(
+          editingOperatorId
+            ? current.map((operator) =>
+                operator.id === savedOperator.id ? savedOperator : operator,
+              )
+            : [...current, savedOperator],
+        ),
+      );
+      resetOperatorForm();
+      setNotice(
+        editingOperatorId
+          ? "Operator updated successfully."
+          : "Operator created successfully.",
+      );
+    } catch (err) {
+      setError(getErrorMessage(err, "Could not save operator."));
+    } finally {
+      setIsOperatorSaving(false);
+    }
+  };
+
+  const setOperatorActive = async (operator, active) => {
+    setError("");
+    setNotice("");
+
+    if (!canManageOperators) {
+      setError("You do not have permission to manage operators.");
+      return;
+    }
+
+    setIsOperatorSaving(true);
+    try {
+      const savedOperator = active
+        ? await operatorsService.updateOperator(operator.id, { active: true })
+        : await operatorsService.deactivateOperator(operator.id);
+
+      setOperators((current) =>
+        sortOperators(
+          current.map((item) =>
+            item.id === savedOperator.id ? savedOperator : item,
+          ),
+        ),
+      );
+      if (editingOperatorId === operator.id) resetOperatorForm();
+      setNotice(active ? "Operator activated." : "Operator deactivated.");
+    } catch (err) {
+      setError(getErrorMessage(err, "Could not update operator."));
+    } finally {
+      setIsOperatorSaving(false);
+    }
+  };
+
   return (
     <FinanceContext.Provider
       value={{
         activeOperators,
         activeSection,
+        canCreateTransactions,
+        canManageOperators,
+        canReadSettings,
+        canUpdateSettings,
+        canViewReports,
+        canViewTransactions,
         currencies,
         currencySummary,
+        currentUser,
         dailySummary,
         dateFilter,
         downloadTransactions,
+        editingOperatorId,
         error,
         filteredTransactions,
         handlePasswordChange,
@@ -447,6 +716,8 @@ export function FinanceProvider({ children }) {
         isCheckingSession,
         isImporting,
         isLoading,
+        isOperatorSaving,
+        isOperatorsLoading,
         isPasswordSaving,
         isSaving,
         isSignedIn,
@@ -455,25 +726,37 @@ export function FinanceProvider({ children }) {
         monthlyIncomeLeaders,
         notice,
         openNewTransaction,
+        operatorForm,
+        operatorPermissions,
         operatorSummary,
+        operators,
         passwordForm,
         pipelines,
         reportCardTotals,
         resetOpen,
+        resetOperatorForm,
         savePreference,
+        saveOperator,
         saveSettings,
         setActiveSection,
         setDateFilter,
         setError,
         setLoginForm,
         setNotice,
+        setOperatorActive,
+        setOperatorForm,
         setPasswordForm,
         setResetOpen,
         setSettings,
         settings,
+        startEditingOperator,
         transactionForm,
         transactions,
+        toggleOperatorPermission,
         updateTransactionForm,
+        visibleNavItems,
+        hasPermission,
+        hasAnyPermission,
       }}
     >
       {children}

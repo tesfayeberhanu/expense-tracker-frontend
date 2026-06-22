@@ -3,10 +3,10 @@ import { apiClient } from "./apiClient";
 export const authService = {
   async checkSession() {
     try {
-      await apiClient.get("session");
-      return true;
+      const response = await apiClient.get("session");
+      return response.data;
     } catch {
-      return false;
+      return null;
     }
   },
 

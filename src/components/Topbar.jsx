@@ -6,6 +6,10 @@ import { useFinance } from "../context";
 export default function Topbar() {
   const {
     activeSection,
+    canCreateTransactions,
+    canReadSettings,
+    canUpdateSettings,
+    currentUser,
     handleSignOut,
     openNewTransaction,
     setActiveSection,
@@ -15,6 +19,7 @@ export default function Topbar() {
   const [profileOpen, setProfileOpen] = useState(false);
   const profileRef = useRef(null);
   const [title, subtitle] = sectionCopy[activeSection] || sectionCopy.overview;
+  const canOpenSettings = canReadSettings || canUpdateSettings;
 
   useEffect(() => {
     const closeProfileMenu = (event) => {
@@ -32,7 +37,7 @@ export default function Topbar() {
         <p className="subtitle">{subtitle}</p>
       </div>
       <div className="topbar-actions">
-        {activeSection === "transactions" && (
+        {activeSection === "transactions" && canCreateTransactions && (
           <button
             className="header-action"
             type="button"
@@ -54,18 +59,20 @@ export default function Topbar() {
           {profileOpen && (
             <div className="profile-menu">
               <div className="profile-menu-header">
-                <strong>{settings.name}</strong>
-                <span>{settings.email}</span>
+                <strong>{currentUser?.username || settings.name}</strong>
+                <span>{currentUser?.role || settings.email}</span>
               </div>
-              <button
-                type="button"
-                onClick={() => {
-                  setActiveSection("settings");
-                  setProfileOpen(false);
-                }}
-              >
-                ⚙ Account settings
-              </button>
+              {canOpenSettings && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setActiveSection("settings");
+                    setProfileOpen(false);
+                  }}
+                >
+                  ⚙ Account settings
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => {
