@@ -19,7 +19,7 @@ export default function TransactionForm() {
         </div>
       </div>
       <form onSubmit={handleSubmit}>
-        <label htmlFor="date">Date</label>
+        <label htmlFor="date">Transaction Date</label>
         <input
           id="date"
           name="date"
@@ -28,6 +28,7 @@ export default function TransactionForm() {
           value={transactionForm.date}
           onChange={updateTransactionForm}
         />
+        <p className="field-hint">Choose an older date to add backdated transactions.</p>
         <label htmlFor="amount">Amount</label>
         <input
           id="amount"
