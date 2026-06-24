@@ -7,6 +7,7 @@ export default function TransactionForm() {
     editingTransactionId,
     handleSubmit,
     isSaving,
+    normalizeTransactionFormField,
     pipelines,
     transactionForm,
     updateTransactionForm,
@@ -106,6 +107,7 @@ export default function TransactionForm() {
           min="0.000001"
           step="1"
           value={transactionForm.rate}
+          onBlur={normalizeTransactionFormField}
           onChange={updateTransactionForm}
         />
         <label htmlFor="status">Status</label>

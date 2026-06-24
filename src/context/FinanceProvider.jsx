@@ -68,6 +68,13 @@ const formatAmountInput = (value) => {
   return decimalParts.length ? `${formattedInteger}.${decimalPart}` : formattedInteger;
 };
 
+const formatRateInput = (value) => {
+  const number = Number(value || 1);
+  if (!Number.isFinite(number) || number <= 0) return "1";
+  if (Math.abs(number - 1) < 0.00001) return "1";
+  return Number(number.toFixed(6)).toString();
+};
+
 const toTransactionForm = (transaction) => ({
   date: transaction.date
     ? new Date(transaction.date).toISOString().split("T")[0]
@@ -78,7 +85,7 @@ const toTransactionForm = (transaction) => ({
   inChargeOfWithdrawal: transaction.inChargeOfWithdrawal || "",
   to: transaction.to || "",
   currency: transaction.currency || "USDT",
-  rate: String(transaction.rate || 1),
+  rate: formatRateInput(transaction.rate),
   status: transaction.status || "Completed",
   notes: transaction.notes || "",
 });
@@ -421,6 +428,16 @@ export function FinanceProvider({ children }) {
     setTransactionForm((current) => ({
       ...current,
       [name]: name === "amount" ? formatAmountInput(value) : value,
+    }));
+  };
+
+  const normalizeTransactionFormField = (event) => {
+    const { name, value } = event.target;
+    if (name !== "rate") return;
+
+    setTransactionForm((current) => ({
+      ...current,
+      rate: formatRateInput(value),
     }));
   };
 
@@ -836,6 +853,7 @@ export function FinanceProvider({ children }) {
         transactions,
         toggleOperatorPermission,
         updateTransactionForm,
+        normalizeTransactionFormField,
         visibleNavItems,
         hasPermission,
         hasAnyPermission,
