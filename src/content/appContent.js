@@ -6,7 +6,17 @@ export const initialSettings = {
 };
 
 export const initialConfiguration = {
-  pipelines: ["Cash", "Lite", "Habesha", "Best", "Speed", "Santim", "Dash", "Dama"],
+  pipelines: [
+    "Cash",
+    "Lite",
+    "Habesha",
+    "Best",
+    "Speed",
+    "Santim",
+    "Dash",
+    "Dama",
+    "PA",
+  ],
   currencies: ["ETB", "USD", "USDT"],
 };
 
@@ -91,6 +101,7 @@ export const operatorIcons = {
   Santim: "¢",
   Dash: "➜",
   Dama: "♦",
+  PA: "PA",
 };
 
 export const csvColumns = [
