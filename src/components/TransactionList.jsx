@@ -1,7 +1,12 @@
 import { transactionTypes } from "../content";
 import { formatCurrency, formatTransactionDate } from "../util";
 
-export default function TransactionList({ transactions, isLoading }) {
+export default function TransactionList({
+  canEdit = false,
+  isLoading,
+  onEdit,
+  transactions,
+}) {
   if (isLoading) {
     return (
       <div className="empty-state">
@@ -47,6 +52,15 @@ export default function TransactionList({ transactions, isLoading }) {
           <strong className={isExpense ? "amount expense" : "amount income"}>
             {formatCurrency(Math.abs(transaction.amount), transaction.currency)}
           </strong>
+          {canEdit && (
+            <button
+              className="data-button transaction-edit-button"
+              type="button"
+              onClick={() => onEdit?.(transaction)}
+            >
+              Edit
+            </button>
+          )}
         </div>
       </article>
     );

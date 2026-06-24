@@ -13,6 +13,11 @@ export const transactionsService = {
 
   createTransaction,
 
+  async updateTransaction(id, transaction) {
+    const response = await apiClient.put(`transactions/${id}`, transaction);
+    return response.data;
+  },
+
   async createTransactions(transactions) {
     const savedTransactions = [];
 

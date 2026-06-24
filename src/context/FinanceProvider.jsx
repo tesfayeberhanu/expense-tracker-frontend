@@ -51,6 +51,38 @@ const getErrorMessage = (err, fallback) => {
   return `${err?.message || fallback}${details}`;
 };
 
+const parseAmountInput = (value) => Number(String(value).replace(/,/g, ""));
+
+const formatAmountInput = (value) => {
+  const cleaned = String(value)
+    .replace(/,/g, "")
+    .replace(/[^\d.]/g, "");
+  const [integerPart, ...decimalParts] = cleaned.split(".");
+  const formattedInteger = integerPart.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  const decimalPart = decimalParts.join("");
+
+  if (cleaned.endsWith(".") && decimalParts.length === 0) {
+    return `${formattedInteger}.`;
+  }
+
+  return decimalParts.length ? `${formattedInteger}.${decimalPart}` : formattedInteger;
+};
+
+const toTransactionForm = (transaction) => ({
+  date: transaction.date
+    ? new Date(transaction.date).toISOString().split("T")[0]
+    : createInitialTransactionForm().date,
+  amount: formatAmountInput(transaction.amount ?? ""),
+  category: transaction.category || "Expense",
+  from: transaction.from || "Cash",
+  inChargeOfWithdrawal: transaction.inChargeOfWithdrawal || "",
+  to: transaction.to || "",
+  currency: transaction.currency || "USDT",
+  rate: String(transaction.rate || 1),
+  status: transaction.status || "Completed",
+  notes: transaction.notes || "",
+});
+
 export function FinanceProvider({ children }) {
   const [isSignedIn, setIsSignedIn] = useState(false);
   const [currentUser, setCurrentUser] = useState(null);
@@ -61,6 +93,7 @@ export function FinanceProvider({ children }) {
   const [transactionForm, setTransactionForm] = useState(() =>
     createInitialTransactionForm(),
   );
+  const [editingTransactionId, setEditingTransactionId] = useState("");
   const [dateFilter, setDateFilter] = useState(() => createInitialDateFilter());
   const [activeSection, setActiveSection] = useState("overview");
   const [isLoading, setIsLoading] = useState(true);
@@ -107,6 +140,7 @@ export function FinanceProvider({ children }) {
   );
 
   const canCreateTransactions = hasPermission("transactions:create");
+  const canUpdateTransactions = hasPermission("transactions:update");
   const canManageOperators = hasPermission("operators:manage");
   const canReadConfiguration = hasPermission("configuration:read");
   const canReadSettings = hasPermission("settings:read");
@@ -310,14 +344,21 @@ export function FinanceProvider({ children }) {
   const handleSubmit = async (event) => {
     event.preventDefault();
     setError("");
-    if (!canCreateTransactions) {
-      setError("You do not have permission to create transactions.");
+    if (editingTransactionId ? !canUpdateTransactions : !canCreateTransactions) {
+      setError(
+        editingTransactionId
+          ? "You do not have permission to update transactions."
+          : "You do not have permission to create transactions.",
+      );
       return;
     }
 
+    const amount = parseAmountInput(transactionForm.amount);
+
     if (
       !transactionForm.amount ||
-      Number(transactionForm.amount) <= 0 ||
+      !Number.isFinite(amount) ||
+      amount <= 0 ||
       !transactionForm.to.trim()
     ) {
       setError("Add a receiver and an amount greater than zero.");
@@ -326,23 +367,39 @@ export function FinanceProvider({ children }) {
 
     setIsSaving(true);
     try {
-      const savedTransaction = await transactionsService.createTransaction({
+      const payload = {
         ...transactionForm,
-        amount: Number(transactionForm.amount),
+        amount,
         rate: Number(transactionForm.rate || 1),
         to: transactionForm.to.trim(),
         notes: transactionForm.notes.trim(),
-      });
+      };
+      const savedTransaction = editingTransactionId
+        ? await transactionsService.updateTransaction(editingTransactionId, payload)
+        : await transactionsService.createTransaction(payload);
       if (canViewTransactions) {
-        setTransactions((current) => [savedTransaction, ...current]);
+        setTransactions((current) =>
+          editingTransactionId
+            ? current.map((transaction) =>
+                transaction._id === editingTransactionId
+                  ? savedTransaction
+                  : transaction,
+              )
+            : [savedTransaction, ...current],
+        );
       }
+      setEditingTransactionId("");
       setTransactionForm((current) => ({
         ...createInitialTransactionForm(),
         date: current.date,
         from: current.from,
         currency: current.currency,
       }));
-      setNotice("Transaction added successfully.");
+      setNotice(
+        editingTransactionId
+          ? "Transaction updated successfully."
+          : "Transaction added successfully.",
+      );
     } catch (err) {
       setError(getErrorMessage(err, "Could not save that transaction."));
     } finally {
@@ -353,13 +410,34 @@ export function FinanceProvider({ children }) {
   const openNewTransaction = () => {
     if (!canCreateTransactions) return;
 
+    setEditingTransactionId("");
+    setTransactionForm(createInitialTransactionForm());
     setActiveSection("transactions");
     window.setTimeout(() => document.querySelector("#amount")?.focus(), 0);
   };
 
   const updateTransactionForm = (event) => {
     const { name, value } = event.target;
-    setTransactionForm((current) => ({ ...current, [name]: value }));
+    setTransactionForm((current) => ({
+      ...current,
+      [name]: name === "amount" ? formatAmountInput(value) : value,
+    }));
+  };
+
+  const startEditingTransaction = (transaction) => {
+    if (!canUpdateTransactions) return;
+
+    setError("");
+    setNotice("");
+    setEditingTransactionId(transaction._id);
+    setTransactionForm(toTransactionForm(transaction));
+    setActiveSection("transactions");
+    window.setTimeout(() => document.querySelector("#amount")?.focus(), 0);
+  };
+
+  const cancelEditingTransaction = () => {
+    setEditingTransactionId("");
+    setTransactionForm(createInitialTransactionForm());
   };
 
   const downloadTransactions = () => {
@@ -696,6 +774,7 @@ export function FinanceProvider({ children }) {
         canManageOperators,
         canReadSettings,
         canUpdateSettings,
+        canUpdateTransactions,
         canViewReports,
         canViewTransactions,
         currencies,
@@ -704,6 +783,7 @@ export function FinanceProvider({ children }) {
         dailySummary,
         dateFilter,
         downloadTransactions,
+        editingTransactionId,
         editingOperatorId,
         error,
         filteredTransactions,
@@ -734,6 +814,7 @@ export function FinanceProvider({ children }) {
         pipelines,
         reportCardTotals,
         resetOpen,
+        cancelEditingTransaction,
         resetOperatorForm,
         savePreference,
         saveOperator,
@@ -749,6 +830,7 @@ export function FinanceProvider({ children }) {
         setResetOpen,
         setSettings,
         settings,
+        startEditingTransaction,
         startEditingOperator,
         transactionForm,
         transactions,

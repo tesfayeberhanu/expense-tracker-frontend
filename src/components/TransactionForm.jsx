@@ -2,7 +2,9 @@ import { useFinance } from "../context";
 
 export default function TransactionForm() {
   const {
+    cancelEditingTransaction,
     currencies,
+    editingTransactionId,
     handleSubmit,
     isSaving,
     pipelines,
@@ -15,7 +17,7 @@ export default function TransactionForm() {
       <div className="panel-heading form-heading">
         <div>
           <p className="eyebrow">Quick entry</p>
-          <h2>New transaction</h2>
+          <h2>{editingTransactionId ? "Edit transaction" : "New transaction"}</h2>
         </div>
       </div>
       <form onSubmit={handleSubmit}>
@@ -33,10 +35,9 @@ export default function TransactionForm() {
         <input
           id="amount"
           name="amount"
-          type="number"
-          min="0.01"
-          step="0.01"
-          placeholder="e.g. 1000"
+          type="text"
+          inputMode="decimal"
+          placeholder="e.g. 1,000"
           required
           value={transactionForm.amount}
           onChange={updateTransactionForm}
@@ -103,7 +104,7 @@ export default function TransactionForm() {
           name="rate"
           type="number"
           min="0.000001"
-          step="0.01"
+          step="1"
           value={transactionForm.rate}
           onChange={updateTransactionForm}
         />
@@ -127,9 +128,23 @@ export default function TransactionForm() {
           onChange={updateTransactionForm}
         />
         <button className="submit-button" type="submit" disabled={isSaving}>
-          {isSaving ? "Saving..." : "Add transaction"}
+          {isSaving
+            ? "Saving..."
+            : editingTransactionId
+              ? "Update transaction"
+              : "Add transaction"}
           <span>→</span>
         </button>
+        {editingTransactionId && (
+          <button
+            className="data-button"
+            type="button"
+            onClick={cancelEditingTransaction}
+            disabled={isSaving}
+          >
+            Cancel edit
+          </button>
+        )}
       </form>
     </section>
   );

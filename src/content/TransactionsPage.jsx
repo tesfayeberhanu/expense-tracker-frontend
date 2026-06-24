@@ -4,6 +4,7 @@ import { useFinance } from "../context";
 export default function TransactionsPage() {
   const {
     canCreateTransactions,
+    canUpdateTransactions,
     canViewTransactions,
     downloadTransactions,
     filteredTransactions,
@@ -11,6 +12,7 @@ export default function TransactionsPage() {
     importTransactions,
     isImporting,
     isLoading,
+    startEditingTransaction,
   } = useFinance();
 
   return (
@@ -61,8 +63,10 @@ export default function TransactionsPage() {
           </div>
           <div className="transaction-list">
             <TransactionList
+              canEdit={canUpdateTransactions}
               transactions={filteredTransactions}
               isLoading={isLoading}
+              onEdit={startEditingTransaction}
             />
           </div>
         </section>
