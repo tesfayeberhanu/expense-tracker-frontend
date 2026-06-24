@@ -1723,12 +1723,18 @@ h1 {
   }
 
   .sidebar {
-    position: static;
+    position: sticky;
+    z-index: 10;
+    top: 0;
     width: 100%;
-    height: 62px;
+    min-height: 70px;
+    height: auto;
     flex-direction: row;
-    justify-content: space-between;
-    padding: 10px 16px;
+    align-items: center;
+    justify-content: flex-start;
+    gap: 10px;
+    padding: 10px 12px;
+    box-shadow: 0 10px 28px rgba(8, 22, 16, 0.16);
   }
 
   .brand-mark {
@@ -1738,11 +1744,39 @@ h1 {
 
   .nav-list {
     display: flex;
+    flex: 1;
+    gap: 6px;
+    overflow-x: auto;
+    padding-bottom: 2px;
     margin: 0;
+    scrollbar-width: none;
+  }
+
+  .nav-list::-webkit-scrollbar {
+    display: none;
   }
 
   .nav-item {
+    min-width: 64px;
     width: auto;
+    flex-direction: column;
+    gap: 4px;
+    padding: 7px 8px;
+    border-radius: 12px;
+    font-size: 9px !important;
+    line-height: 1.1;
+    text-align: center;
+    white-space: nowrap;
+  }
+
+  .nav-item.active {
+    box-shadow: inset 0 -2px #c6f36b;
+  }
+
+  .nav-icon {
+    width: 26px;
+    height: 26px;
+    font-size: 13px;
   }
 
   .sidebar-footer {
@@ -1750,11 +1784,32 @@ h1 {
   }
 
   .main-content {
-    padding: 26px 16px 40px;
+    padding: 22px 14px 48px;
   }
 
   .topbar {
     align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 14px;
+    margin-bottom: 22px;
+  }
+
+  .topbar > div:first-child {
+    min-width: 0;
+    flex: 1 1 220px;
+  }
+
+  .topbar-actions {
+    margin-left: auto;
+  }
+
+  h1 {
+    font-size: 28px;
+  }
+
+  .subtitle {
+    max-width: 28rem;
+    font-size: 12px;
   }
 
   .header-action {
@@ -1770,18 +1825,41 @@ h1 {
 
   .summary-grid {
     grid-template-columns: 1fr;
+    gap: 12px;
   }
 
   .summary-card {
     min-height: auto;
+    padding: 17px;
   }
 
   .topbar-actions {
     gap: 6px;
   }
 
+  .panel-heading {
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 12px;
+    padding: 17px;
+  }
+
+  .transaction-tools {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .content-grid,
+  .settings-grid,
+  .operator-admin-grid {
+    grid-template-columns: 1fr;
+    gap: 14px;
+  }
+
   .date-filter {
     align-items: stretch;
+    gap: 8px;
+    padding: 9px;
   }
 
   .date-filter-modes {
@@ -1799,8 +1877,26 @@ h1 {
     text-align: center;
   }
 
+  .date-range-fields {
+    width: 100%;
+  }
+
+  .date-range-fields label,
+  .date-filter > label {
+    width: 100%;
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .date-filter input {
+    width: 100%;
+    min-height: 38px;
+    font-size: 16px;
+  }
+
   .category-grid {
     grid-template-columns: 1fr;
+    gap: 14px;
   }
 
   .operator-totals {
@@ -1819,8 +1915,113 @@ h1 {
     flex: 1;
   }
 
-  .transaction-stamp time {
-    font-size: 7px;
+  .transaction-row {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: start;
+    padding: 14px 16px;
   }
 
+  .transaction-stamp {
+    grid-column: 2;
+    justify-items: start;
+    gap: 5px;
+  }
+
+  .transaction-stamp time {
+    font-size: 8px;
+  }
+
+  .transaction-edit-button {
+    margin-top: 3px;
+  }
+
+  .form-panel form,
+  .settings-body,
+  .modal form,
+  .operator-admin-grid {
+    padding: 17px;
+  }
+
+  .form-panel input,
+  .form-panel select,
+  .settings-body > input,
+  .modal input,
+  .operator-form input:not([type="checkbox"]) {
+    min-height: 44px;
+    font-size: 16px;
+  }
+
+  .form-panel label {
+    font-size: 13px;
+  }
+
+  .submit-button,
+  .secondary-button,
+  .data-button {
+    min-height: 40px;
+  }
+
+  .operator-form-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .operator-table-wrap,
+  .currency-table-wrap {
+    margin-inline: -2px;
+  }
+
+  .modal-backdrop {
+    align-items: end;
+    padding: 14px;
+  }
+
+  .modal {
+    width: 100%;
+    max-height: calc(100vh - 28px);
+    overflow-y: auto;
+    padding: 24px 22px 6px;
+  }
+
+}
+
+@media (max-width: 420px) {
+  .sidebar {
+    align-items: stretch;
+    flex-wrap: wrap;
+  }
+
+  .brand {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .nav-list {
+    width: 100%;
+    flex: none;
+  }
+
+  .nav-item {
+    min-width: 58px;
+  }
+
+  .main-content {
+    padding-inline: 10px;
+  }
+
+  .login-page {
+    padding: 14px;
+  }
+
+  .login-card {
+    padding: 24px 20px;
+  }
+
+  .panel {
+    border-radius: 13px;
+  }
+
+  .transaction-row {
+    padding-inline: 13px;
+  }
 }
