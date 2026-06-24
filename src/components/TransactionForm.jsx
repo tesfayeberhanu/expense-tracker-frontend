@@ -105,7 +105,7 @@ export default function TransactionForm() {
           name="rate"
           type="number"
           min="0.000001"
-          step="1"
+          step="0.01"
           value={transactionForm.rate}
           onBlur={normalizeTransactionFormField}
           onChange={updateTransactionForm}
